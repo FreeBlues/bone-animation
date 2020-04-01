@@ -1,4 +1,4 @@
 # bone-animation
 Codea Bone Animation
 
-![Bone Animation](./IMG_3476.PNG)
+![Bone Animation](file:\\./IMG_3476.PNG)
