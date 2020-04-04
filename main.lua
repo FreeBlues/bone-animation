@@ -39,8 +39,12 @@ function draw()
 
     -- 绘制 craft 模型    
     scene:draw()
-    drawAxis(scene, vec3(0,0,0), 1)
+    drawAxis(scene, vec3(0,0,0), 1/5)
     
+    for k=1,13 do
+        drawAxis(scene, b[k], 1/15)
+    end
+       
     -- 准备 mesh 模型的绘制环境参数设置
     perspective()    
     setupMeshCamera()
@@ -124,7 +128,7 @@ function Robot:init(objArray)
     self.lowestForDrawTemp = {}
     
     -- 各部位在模型空间的位置坐标
-    local b = {vec3(0,0,0),vec3(0,0.938,0),vec3(0,1,0),vec3(0.107,0.938,0),
+    b = {vec3(0,0,0),vec3(0,0.938,0),vec3(0,1,0),vec3(0.107,0.938,0),
     vec3(0.105,0.707,-0.033),vec3(-0.107,0.938,0),vec3(-0.105,0.707,-0.033),
     vec3(-0.068,0.6,0.02),vec3(-0.056,0.312,0),vec3(0.068,0.6,0.02),
     vec3(0.056,0.312,0),vec3(0.068,0.038,0.033),vec3(-0.068,0.038,0.033)}
@@ -220,16 +224,19 @@ function Robot:flushDrawData()
 end
 
 function Robot:drawSelf()
+
+    self.lowestForDrawTemp = self.lowestForDraw;
+    local lowY = self.lowestForDrawTemp
+    
     -- 生成各部位的最终用变换矩阵 modelMatrix
-    for i=1,#self.bpArray do
-        for j=1,16 do
-        self.finalMatrixForDrawArrayTemp[i][j] = self.finalMatrixForDrawArray[i][j]            
-        end
+    for i=1,#self.bpArray do 
+        self.finalMatrixForDrawArrayTemp[i] = self.finalMatrixForDrawArray[i]
+        
+        -- 对最终变换矩阵处理最低点
+        local m = self.finalMatrixForDrawArrayTemp[i]:translate(0, lowY, 0)       
+        self.finalMatrixForDrawArrayTemp[i] = m                        
     end
     
-    self.lowestForDrawTemp=self.lowestForDraw;
-    modelMatrix(modelMatrix():translate(0, -self.lowestForDrawTemp, 0))
-
     -- 使用 BodyPart 的 drawSelf 方法，从根骨骼部件开始绘制
     self.bRoot:drawSelf(self.finalMatrixForDrawArrayTemp)
 end
@@ -286,9 +293,7 @@ function BodyPart:calLowest()
 end
 
 function BodyPart:copyMatrixForDraw()
-    for i=1,16,1 do
-        self.robot.finalMatrixForDrawArray[self.index][i] = self.finalMatrix[i]
-    end
+    self.robot.finalMatrixForDrawArray[self.index] = self.finalMatrix
 end
 
 function BodyPart:drawSelf(tempMatrixArray)
@@ -298,7 +303,7 @@ function BodyPart:drawSelf(tempMatrixArray)
         -- 这里更新用于 mesh 的矩阵运动数据 === 需要修改
         modelMatrix(tempMatrixArray[self.index])
 
-        -- 绘制 loadObjVerNorTex 模型：包括 craft 和 mesh
+        -- 绘制 loadObject 模型：mesh 形式
         self.object:drawSelf()
         popMatrix()
     end
@@ -318,10 +323,8 @@ function BodyPart:initFatherMatrix()
     -- 计算各骨骼模型其父骨骼空间的变换矩阵
     self.mFather = matrix()
     self.mFather = self.mFather:translate(tx,ty,tz)
-    for i=1,16,1 do
-        self.mFatherInit[i] = self.mFather[i]
-    end
-    
+    self.mFatherInit = self.mFather
+   
     -- 更新所有子节点
     for k,bc in ipairs(self.childs) do
         bc:initFatherMatrix()
@@ -342,9 +345,7 @@ function BodyPart:updateBone()
         -- Codea 使用列矩阵，矩阵要左乘
         self.mWorld = self.mFather * self.father.mWorld
     else
-        for i=1,16,1 do
-            self.mWorld[i] = self.mFather[i]
-        end
+        self.mWorld = self.mFather
     end
     
     -- 计算每个骨骼部件的最终变换矩阵
@@ -362,9 +363,7 @@ function BodyPart:calFinalMatrix()
 end
 
 function BodyPart:backToInit()
-    for i=1,16,1 do
-        self.mFather[i] = self.mFatherInit[i]
-    end
+    self.mFather = self.mFatherInit
     
     -- 更新所有子节点    
     for k,bc in ipairs(self.childs) do
@@ -373,23 +372,23 @@ function BodyPart:backToInit()
 end
 
 function BodyPart:translate(x,y,z)
-    -- mesh 模型根据 DoActionThread 中的平移数据实时进行设置
+    -- mesh 模型操作矩阵：根据 DoActionThread 中的平移数据实时进行设置
     self.mFather = self.mFather:translate(x,y,z)
     
-    -- craft 模型根据 DoActionThread 中的平移数据实时进行设置
+    -- craft 模型操作属性：根据 DoActionThread 中的平移数据实时进行设置
     -- 分析这两种写法的区别
     -- self.lovnt.e.position = m * self.lovnt.e.position
     self.robot.bpArray[self.index].object.e.worldPosition = vec3(x,y,z)
 end
 
 function BodyPart:rotate(a,x,y,z)
-    -- mesh 模型根据 DoActionThread 中的旋转数据实时进行设置
+    -- mesh 模型操作矩阵：根据 DoActionThread 中的旋转数据实时进行设置
     self.mFather = self.mFather:rotate(a,x,y,z)
 
-    -- craft 模型根据 DoActionThread 中的旋转数据实时进行设置
+    -- craft 模型操作属性：根据 DoActionThread 中的旋转数据实时进行设置
     local q = axis2quat(a,x,y,z)
     local fXYZ = vec3(self.x,self.y,self.z)*(-1)
-    self.robot.bpArray[self.index].object.e.worldPosition = fXYZ
+    -- self.robot.bpArray[self.index].object.e.worldPosition = fXYZ
     self.robot.bpArray[self.index].object.e.rotation = q
 end
 
@@ -467,16 +466,15 @@ function LoadObject:model2mesh(model,id)
     else
         local t = json.decode(str)   
         vt,tt,nt,ct = t[1], t[2], t[3], t[4]              
-        print("t ", #t[3][2], t[1][1][1])
-        -- 重组
+        -- print("t[3][2], t[1][1][1]", #t[3][2], t[1][1][1])
+        -- 重组坐标：顶点，纹理，法线，颜色
         for k = 1,#vt do
             vb[k] = vec3(vt[k][1], vt[k][2], vt[k][3])
             tb[k] = vec2(tt[k][1], tt[k][2])
             nb[k] = vec3(nt[k][1], nt[k][2], nt[k][3])
             cb[k] = vec3(ct[k][1], ct[k][2], ct[k][3])
         end        
-    end    
-    
+    end        
     print("indices: ", #indices, type(id), id)
     return m
 end
@@ -693,7 +691,7 @@ function DoActionThread:update(dt)
     self.robot:updateState()
     self.robot:calLowest()
     self.robot:flushDrawData()
-    self.currStep = self.currStep+1
+    self.currStep = self.currStep + 1
 end
 
 
@@ -811,7 +809,5 @@ function Action:init()
     self.data = {{},{},{},{},{},{},{},{},{},{}}
     self.totalStep = 0
 end
-
-
 
 
