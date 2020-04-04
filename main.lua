@@ -1,8 +1,11 @@
 
+
 --# Main
 -- BoneMesh
--- 本项目结合 Bones 和 MeshTest 以及 BoneTest 三个项目的代码，使用 mesh 模型作为矩阵变换对象
+-- 本项目结合 Bones/MeshTest/BoneTest 三个项目的代码，使用 mesh 模型作为矩阵变换对象
 -- 2020.02.22 需解决无法递归显示各骨骼部件的问题
+-- 2020.04.04 修改 BodyPart 参数为 vec3
+-- https://github.com/FreeBlues/bone-animation/tree/master/
 
 function setup()
     -- craft scene 初始化
@@ -37,10 +40,7 @@ function draw()
 
     -- 绘制 craft 模型    
     scene:draw()
-    -- 绘制坐标轴
-    scene.debug:line(vec3(0,0,0),vec3(1,0,0),color(255,0,0,255))  
-    scene.debug:line(vec3(0,0,0),vec3(0,1,0),color(0,255,0,255))   
-    scene.debug:line(vec3(0,0,0),vec3(0,0,1),color(255,255,0,255))  
+    drawAxis(scene, vec3(0,0,0), 1)
     
     -- 准备 mesh 模型的绘制环境参数设置
     perspective()
@@ -53,6 +53,15 @@ function draw()
     
     -- 调用 Robot 类对象的 drawSelf 方法
     robot:drawSelf()   
+end
+
+function drawAxis(scene,pos,unit)
+    local l = unit or 1
+    local o,x,y,z = vec3(0,0,0),vec3(l,0,0),vec3(0,l,0),vec3(0,0,l)
+    -- 绘制坐标轴
+    scene.debug:line(o+pos, x+pos, color(255,0,0,255))  
+    scene.debug:line(o+pos, y+pos, color(0,255,0,255))   
+    scene.debug:line(o+pos, z+pos, color(255,255,0,255))      
 end
 
 function objectsInit()
@@ -111,29 +120,37 @@ end
 --# Robot
 Robot = class()
 
-function Robot:init(objectArray)   
+function Robot:init(objArray)   
     self.lowest = math.huge
     self.lowestForDraw = {}
     self.lowestForDrawTemp = {}
     
-    self.bRoot = BodyPart(0,0,0,objectArray[1],1,self)
-    self.bBody = BodyPart(0,0.938,0,objectArray[2],2,self)
-    self.bHead = BodyPart(0,1,0,objectArray[3],3,self)
+    -- 各部位在模型空间的位置坐标
+    local b = {vec3(0,0,0),vec3(0,0.938,0),vec3(0,1,0),vec3(0.107,0.938,0),
+    vec3(0.105,0.707,-0.033),vec3(-0.107,0.938,0),vec3(-0.105,0.707,-0.033),
+    vec3(-0.068,0.6,0.02),vec3(-0.056,0.312,0),vec3(0.068,0.6,0.02),
+    vec3(0.056,0.312,0),vec3(0.068,0.038,0.033),vec3(-0.068,0.038,0.033)}
     
-    self.bLeftTop = BodyPart(0.107,0.938,0,objectArray[4],4,self)
-    self.bLeftBottom = BodyPart(0.105,0.707,-0.033,objectArray[5],5,self)
-    self.bRightTop = BodyPart(-0.107,0.938,0,objectArray[6],6,self)
-    self.bRightBottom = BodyPart(-0.105,0.707,-0.033,objectArray[7],7,self)
+    self.bRoot = BodyPart(b[1],objArray[1],1,self)
+    self.bBody = BodyPart(b[2],objectArray[2],2,self)
+    self.bHead = BodyPart(b[3],objectArray[3],3,self)
     
-    self.bRightLegTop = BodyPart(-0.068,0.6,0.02,objectArray[8],8,self)
-    self.bRightLegBottom = BodyPart(-0.056,0.312,0,objectArray[9],9,self)
-    self.bLeftLegTop = BodyPart(0.068,0.6,0.02,objectArray[10],10,self)
-    self.bLeftLegBottom = BodyPart(0.056,0.312,0,objectArray[11],11,self)
+    self.bLeftTop = BodyPart(b[4],objArray[4],4,self)
+    self.bLeftBottom = BodyPart(b[5],objArray[5],5,self)
+    self.bRightTop = BodyPart(b[6],objArray[6],6,self)
+    self.bRightBottom = BodyPart(b[7],objectArray[7],7,self)
+    
+    self.bRightLegTop = BodyPart(b[8],objArray[8],8,self)
+    self.bRightLegBottom = BodyPart(b[9],objArray[9],9,self)
+    self.bLeftLegTop = BodyPart(b[10],objArray[10],10,self)
+    self.bLeftLegBottom = BodyPart(b[11],objArray[11],11,self)
     
     local leftFootLowest = {{0.068,0.0,0.113},{0.068,0,-0.053}}
     local rightFootLowest = {{-0.068,0.0,0.113},{-0.068,0,-0.053}}
-    self.bLeftFoot = BodyPart(0.068,0.038,0.033,objectArray[12],12,self,true,leftFootLowest)
-    self.bRightFoot = BodyPart(-0.068,0.038,0.033,objectArray[13],13,self,true,rightFootLowest)
+    
+    self.bLeftFoot = BodyPart(b[12],objArray[12],12,self,true,leftFootLowest)
+    self.bRightFoot = BodyPart(b[13],objArray[13],13,self,true,rightFootLowest)
+    
     print("robot ",self.bRightFoot.lowestDots[1][1])
     self.bpArray = {}
     self.bpArray[1] = self.bRoot 
@@ -150,7 +167,7 @@ function Robot:init(objectArray)
     self.bpArray[12] = self.bLeftFoot 
     self.bpArray[13] = self.bRightFoot
     
-    -- 建立各部件的层次结构
+    -- 建立各部件的层次结构，用于 mesh
     self.bRoot:addChild(self.bBody) 
       
     self.bBody:addChild(self.bHead)
@@ -226,14 +243,14 @@ BodyPart = class()
 -- 当前存在两个问题：1 BodyPart:drawSelf() 中矩阵的设置错误；2 Robot:drawSelf() 中只绘制了 bRoot，没有循环绘制它的 child 节点
 -- 新问题：矩阵参数如何传递到 lovnt:drawSelf()
 
-function BodyPart:init(fx,fy,fz,lovnt,index,robot,lowestFlag,lowestDots)
+function BodyPart:init(fXYZ,lovnt,index,robot,lowestFlag,lowestDots)
     self.index = index
     self.object = lovnt
     self.object.e.position = vec3(fx,fy,fz)
     self.object.e.active = true
-    self.fx = fx
-    self.fy = fy
-    self.fz = fz
+    self.fx = fXYZ.x
+    self.fy = fXYZ.y
+    self.fz = fXYZ.z
     self.robot = robot
     self.father = nil
     self.mFather = matrix()
