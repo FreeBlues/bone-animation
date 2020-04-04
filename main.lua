@@ -1,19 +1,18 @@
 
-
 --# Main
 -- BoneMesh
 -- 本项目结合 Bones/MeshTest/BoneTest 三个项目的代码，使用 mesh 模型作为矩阵变换对象
--- 2020.02.22 需解决无法递归显示各骨骼部件的问题
--- 2020.04.04 修改 BodyPart 参数为 vec3
+-- 20200222 无法递归显示各骨骼部件的问题：原因是递归代码错误使用return，去掉return即可
+-- 20200404 整理代码，删除无用的注释行
 -- https://github.com/FreeBlues/bone-animation/tree/master/
 
 function setup()
     -- craft scene 初始化
     craftSceneInit()
-    objectsInit()
+    entityInit()
     
-    -- 使用 lovntArray 数组中加载好的模型对象初始化 robot
-    robot = Robot(objectArray)
+    -- 使用 entityArray 数组中加载好的模型对象初始化 robot
+    robot = Robot(entityArray)
     -- 初始化动作数据
     dat = DoActionThread(robot)
 
@@ -31,7 +30,7 @@ function axis2quat(a,x,y,z)
 end
 
 function update(dt)
-    dat:run()
+    dat:update(dt)
     scene:update(dt)
 end
 
@@ -43,16 +42,18 @@ function draw()
     drawAxis(scene, vec3(0,0,0), 1)
     
     -- 准备 mesh 模型的绘制环境参数设置
-    perspective()
-    -- background()
-    
-    -- 根据 craft 的镜头参数来设置 mesh 的镜头参数
-    local scp = scene.camera.position
-    local x,y,z = scp.x, scp.y, scp.z
-    camera(x,y,z,0,0,0, 0,1,0)
+    perspective()    
+    setupMeshCamera()
     
     -- 调用 Robot 类对象的 drawSelf 方法
     robot:drawSelf()   
+end
+
+function setupMeshCamera()
+    -- 根据 craft 的镜头参数来设置 mesh 的镜头参数
+    local scp = scene.camera.position
+    local x,y,z = scp.x, scp.y, scp.z
+    camera(x,y,z,0,0,0, 0,1,0)    
 end
 
 function drawAxis(scene,pos,unit)
@@ -64,27 +65,27 @@ function drawAxis(scene,pos,unit)
     scene.debug:line(o+pos, z+pos, color(255,255,0,255))      
 end
 
-function objectsInit()
+function entityInit()
     
     -- 只运行一次：创建14个数据文件：Model1.txt ~ Model14.txt
     for k=1,14 do
         -- saveText(asset.."Model"..k..".txt", "")
     end
     
-    objectArray = {}   
-    objectArray[1] = LoadObject("Documents:body", 1)
-    objectArray[2] = LoadObject("Documents:body", 2)  
-    objectArray[3] = LoadObject("Documents:head", 3)   
-    objectArray[4] = LoadObject("Documents:left_top",4)   
-    objectArray[5] = LoadObject("Documents:left_bottom",5)   
-    objectArray[6] = LoadObject("Documents:right_top",6)   
-    objectArray[7] = LoadObject("Documents:right_bottom",7)   
-    objectArray[8] = LoadObject("Documents:right_leg_top",8)   
-    objectArray[9] = LoadObject("Documents:right_leg_bottom",9)   
-    objectArray[10] = LoadObject("Documents:left_leg_top",10)   
-    objectArray[11] = LoadObject("Documents:left_leg_bottom",11)   
-    objectArray[12] = LoadObject("Documents:left_foot", 12)   
-    objectArray[13] = LoadObject("Documents:right_foot", 13) 
+    entityArray = {}   
+    entityArray[1] = LoadObject("Documents:body", 1)
+    entityArray[2] = LoadObject("Documents:body", 2)  
+    entityArray[3] = LoadObject("Documents:head", 3)   
+    entityArray[4] = LoadObject("Documents:left_top",4)   
+    entityArray[5] = LoadObject("Documents:left_bottom",5)   
+    entityArray[6] = LoadObject("Documents:right_top",6)   
+    entityArray[7] = LoadObject("Documents:right_bottom",7)   
+    entityArray[8] = LoadObject("Documents:right_leg_top",8)   
+    entityArray[9] = LoadObject("Documents:right_leg_bottom",9)   
+    entityArray[10] = LoadObject("Documents:left_leg_top",10)   
+    entityArray[11] = LoadObject("Documents:left_leg_bottom",11)   
+    entityArray[12] = LoadObject("Documents:left_foot", 12)   
+    entityArray[13] = LoadObject("Documents:right_foot", 13) 
     
     floor = LoadObject("Documents:floor", 14)
 end
@@ -103,9 +104,6 @@ function craftSceneInit()
     scene.camera.position = vec3(0,0,0)
     
     -- 设置场景的一些基本参数
-    -- scene.sun.active = false
-    -- scene.sky.active = false
-    -- Move the main camera
     scene.camera.position = vec3(0, -10, -10)
     
     -- 场景本身光照
@@ -132,13 +130,13 @@ function Robot:init(objArray)
     vec3(0.056,0.312,0),vec3(0.068,0.038,0.033),vec3(-0.068,0.038,0.033)}
     
     self.bRoot = BodyPart(b[1],objArray[1],1,self)
-    self.bBody = BodyPart(b[2],objectArray[2],2,self)
-    self.bHead = BodyPart(b[3],objectArray[3],3,self)
+    self.bBody = BodyPart(b[2],objArray[2],2,self)
+    self.bHead = BodyPart(b[3],objArray[3],3,self)
     
     self.bLeftTop = BodyPart(b[4],objArray[4],4,self)
     self.bLeftBottom = BodyPart(b[5],objArray[5],5,self)
     self.bRightTop = BodyPart(b[6],objArray[6],6,self)
-    self.bRightBottom = BodyPart(b[7],objectArray[7],7,self)
+    self.bRightBottom = BodyPart(b[7],objArray[7],7,self)
     
     self.bRightLegTop = BodyPart(b[8],objArray[8],8,self)
     self.bRightLegBottom = BodyPart(b[9],objArray[9],9,self)
@@ -234,20 +232,21 @@ function Robot:drawSelf()
 
     -- 使用 BodyPart 的 drawSelf 方法，从根骨骼部件开始绘制
     self.bRoot:drawSelf(self.finalMatrixForDrawArrayTemp)
-    -- popMatrix()
 end
 
 --# BodyPart
 BodyPart = class()
 
--- 当前存在两个问题：1 BodyPart:drawSelf() 中矩阵的设置错误；2 Robot:drawSelf() 中只绘制了 bRoot，没有循环绘制它的 child 节点
+-- 当前存在两个问题：
+-- 1 BodyPart:drawSelf() 中矩阵的设置错误；
+-- 2 Robot:drawSelf() 中只绘制了 bRoot，没有循环绘制它的 child 节点:递归函数错误
 -- 新问题：矩阵参数如何传递到 lovnt:drawSelf()
 
-function BodyPart:init(fXYZ,lovnt,index,robot,lowestFlag,lowestDots)
+function BodyPart:init(fXYZ,entity,index,robot,lowestFlag,lowestDots)
     self.index = index
-    self.object = lovnt
-    self.object.e.position = vec3(fx,fy,fz)
-    self.object.e.active = true
+    self.object = entity
+    -- self.object.e.position = vec3(fXYZ.x,fXYZ.y,fXYZ.z)
+    -- self.object.e.active = true
     self.fx = fXYZ.x
     self.fy = fXYZ.y
     self.fz = fXYZ.z
@@ -297,9 +296,8 @@ function BodyPart:drawSelf(tempMatrixArray)
     if self.object ~= nil and self.index~=1 then
         pushMatrix()
         -- 这里更新用于 mesh 的矩阵运动数据 === 需要修改
-        -- print("m1 ",modelMatrix())
         modelMatrix(tempMatrixArray[self.index])
-        -- print("m2 ",modelMatrix())
+
         -- 绘制 loadObjVerNorTex 模型：包括 craft 和 mesh
         self.object:drawSelf()
         popMatrix()
@@ -323,7 +321,7 @@ function BodyPart:initFatherMatrix()
     for i=1,16,1 do
         self.mFatherInit[i] = self.mFather[i]
     end
-
+    
     -- 更新所有子节点
     for k,bc in ipairs(self.childs) do
         bc:initFatherMatrix()
@@ -343,7 +341,6 @@ function BodyPart:updateBone()
     if self.father ~= nil then
         -- Codea 使用列矩阵，矩阵要左乘
         self.mWorld = self.mFather * self.father.mWorld
-        -- self.robot.bpArray[self.index].object.e.position = self.mWorld *self.robot.bpArray[self.index].object.e.position 
     else
         for i=1,16,1 do
             self.mWorld[i] = self.mFather[i]
@@ -382,7 +379,7 @@ function BodyPart:translate(x,y,z)
     -- craft 模型根据 DoActionThread 中的平移数据实时进行设置
     -- 分析这两种写法的区别
     -- self.lovnt.e.position = m * self.lovnt.e.position
-    self.robot.bpArray[self.index].object.e.position = vec3(x,y,z)
+    self.robot.bpArray[self.index].object.e.worldPosition = vec3(x,y,z)
 end
 
 function BodyPart:rotate(a,x,y,z)
@@ -391,13 +388,16 @@ function BodyPart:rotate(a,x,y,z)
 
     -- craft 模型根据 DoActionThread 中的旋转数据实时进行设置
     local q = axis2quat(a,x,y,z)
+    local fXYZ = vec3(self.x,self.y,self.z)*(-1)
+    self.robot.bpArray[self.index].object.e.worldPosition = fXYZ
     self.robot.bpArray[self.index].object.e.rotation = q
 end
 
 -- 添加子骨骼
 function BodyPart:addChild(child)
+    -- 把所有子骨骼加入表 self.childs 
     table.insert(self.childs, child)
-    -- self.childs[#self.childs+1] = child
+    -- 设置子骨骼的父亲节点为 self
     child.father = self
 end
 
@@ -417,10 +417,6 @@ function LoadObject:init(objPath,id)
     self.e.active = true
     self.id = id
     self.m = self:model2mesh(self.e.model, self.id)
-    -- self.m.vertices = self.e.model.positions
-    -- self.m.texCoords = self.e.model.uvs
-    -- self.m.normals = self.e.model.normals
-    -- self.m.colors = self.e.colors
 
     self.m:setColors(255,255,255,255)
     self.m.texture = readImage(asset.builtin.Blocks.Ice)
@@ -484,7 +480,6 @@ function LoadObject:model2mesh(model,id)
     print("indices: ", #indices, type(id), id)
     return m
 end
-
 
 function LoadObject:update(dt)
 
@@ -667,8 +662,8 @@ function DoActionThread:init(robot)
     self.currAction = self.actionGenerator.acArray[self.currActionIndex]
 end
 
--- 需要把 run 放在 draw 或 update 中循环执行，生成动作之间的插值数据
-function DoActionThread:run()
+-- 需要把 update 放在 draw 或 update 中循环执行，生成动作之间的插值数据
+function DoActionThread:update(dt)
 
     self.robot:backToInit()
     if self.currStep >= self.currAction.totalStep then
@@ -816,5 +811,7 @@ function Action:init()
     self.data = {{},{},{},{},{},{},{},{},{},{}}
     self.totalStep = 0
 end
+
+
 
 
